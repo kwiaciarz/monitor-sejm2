@@ -51,28 +51,7 @@ def pobierz_posiedzenia_api(kod):
         print(f"Błąd API dla {kod}: {e}")
     return []
 
-def pobierz_posiedzenia_html(komisja_kod="DER"):
-    url = f"https://www.sejm.gov.pl/Sejm10.nsf/PlanPosKom.xsp?view=2&komisja={komisja_kod}"
-    try:
-        response = requests.get(url)
-        response.encoding = 'utf-8'
-        if response.status_code != 200:
-            return []
-        soup = BeautifulSoup(response.text, "html.parser")
-        tabela = soup.find("table", class_="tab_pos")
-        if not tabela:
-            return []
-        posiedzenia = []
-        for wiersz in tabela.find_all("tr")[1:]:
-            komorki = wiersz.find_all("td")
-            if len(komorki) >= 2:
-                data = komorki[0].get_text(strip=True)
-                tytul = komorki[1].get_text(strip=True)
-                posiedzenia.append({"date": data, "title": tytul})
-        return posiedzenia
-    except Exception as e:
-        print(f"Błąd HTML dla {komisja_kod}: {e}")
-        return []
+https://www.sejm.gov.pl/Sejm10.nsf/PlanPosKom.xsp?view=2&komisja=
 
 @app.route("/")
 def index():
