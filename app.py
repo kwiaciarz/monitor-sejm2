@@ -31,12 +31,12 @@ def pobierz_posiedzenia_api(kod):
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
             dane = res.json()
-            print(f"API ({kod}): znaleziono {len(dane)} posiedzeń.")
+            print(f"[API] {kod}: {len(dane)} posiedzeń")
             return [{"date": p.get("date"), "title": p.get("title")} for p in dane]
         else:
-            print(f"API ({kod}): kod odpowiedzi {res.status_code}")
+            print(f"[API] {kod}: kod odpowiedzi {res.status_code}")
     except Exception as e:
-        print(f"Błąd API dla {kod}: {e}")
+        print(f"[API] Błąd dla {kod}: {e}")
     return []
 
 def pobierz_posiedzenia_html(kod):
@@ -44,25 +44,31 @@ def pobierz_posiedzenia_html(kod):
     try:
         res = requests.get(url, timeout=10)
         if res.status_code != 200:
-            print(f"HTML ({kod}): kod odpowiedzi {res.status_code}")
+            print(f"[HTML] {kod}: kod odpowiedzi {res.status_code}")
             return []
 
         soup = BeautifulSoup(res.text, "html.parser")
-        rows = soup.select("table tr")[1:]  # pomijamy nagłówek
+        tabela = soup.find("table")
+        if not tabela:
+            print(f"[HTML] {kod}: brak tabeli na stronie")
+            return []
+
+        rows = tabela.find_all("tr")
         posiedzenia = []
 
-        for row in rows:
+        for row in rows[1:]:  # pomijamy nagłówek
             cols = row.find_all("td")
             if len(cols) >= 2:
                 date = cols[0].get_text(strip=True)
-                title = cols[1].get_text(strip=True)
-                posiedzenia.append({"date": date, "title": title})
+                title = cols[1].get_text(" ", strip=True)
+                if date and title:
+                    posiedzenia.append({"date": date, "title": title})
 
-        print(f"HTML ({kod}): znaleziono {len(posiedzenia)} posiedzeń.")
+        print(f"[HTML] {kod}: {len(posiedzenia)} posiedzeń")
         return posiedzenia
 
     except Exception as e:
-        print(f"Błąd HTML dla {kod}: {e}")
+        print(f"[HTML] Błąd dla {kod}: {e}")
         return []
 
 @app.route("/")
