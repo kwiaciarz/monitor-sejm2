@@ -9,36 +9,20 @@ KOMISJE = ["OSZ", "GOR", "CNT", "DER", "GOR01S", "GOR02S", "GOR03S", "OSZ01S", "
 KADENCJA = 10
 
 HTML_TEMPLATE = """
-<!doctype html>
-<html lang="pl">
-<head>
-    <meta charset="utf-8">
-    <title>Posiedzenia komisji Sejmu RP</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; }
-        h1 { color: #003366; }
-        .komisja { margin-bottom: 2em; }
-        .posiedzenie { margin-left: 1em; }
-    </style>
-</head>
-<body>
-    <h1>Monitor posiedzeń komisji Sejmu RP</h1>
-    {% for komisja, posiedzenia in dane.items() %}
-        <div class="komisja">
-            <h2>{{ komisja }}</h2>
-            {% if posiedzenia %}
-                {% for p in posiedzenia %}
-                    <div class="posiedzenie">
-                        <strong>{{ p.get('date') }}</strong> – {{ p.get('title') }}
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p>Brak zaplanowanych posiedzeń.</p>
-            {% endif %}
-        </div>
-    {% endfor %}
-</body>
-</html>
+# Posiedzenia komisji Sejmu RP
+## Monitor posiedzeń komisji Sejmu RP
+{% for komisja, posiedzenia in dane.items() %}
+### {{ komisja }}
+
+{% if posiedzenia %}
+{% for p in posiedzenia %}
+{{ p.get('date') }} – {{ p.get('title') }}
+{% endfor %}
+{% else %}
+Brak zaplanowanych posiedzeń.
+{% endif %}
+
+{% endfor %}
 """
 
 def pobierz_posiedzenia_api(kod):
@@ -46,19 +30,47 @@ def pobierz_posiedzenia_api(kod):
     try:
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
-            return res.json()
+            dane = res.json()
+            print(f"API ({kod}): znaleziono {len(dane)} posiedzeń.")
+            return [{"date": p.get("date"), "title": p.get("title")} for p in dane]
+        else:
+            print(f"API ({kod}): kod odpowiedzi {res.status_code}")
     except Exception as e:
         print(f"Błąd API dla {kod}: {e}")
     return []
 
-https://www.sejm.gov.pl/Sejm10.nsf/PlanPosKom.xsp?view=2&komisja=
+def pobierz_posiedzenia_html(kod):
+    url = f"https://www.sejm.gov.pl/Sejm10.nsf/PlanPosKom.xsp?view=2&komisja={kod}"
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code != 200:
+            print(f"HTML ({kod}): kod odpowiedzi {res.status_code}")
+            return []
+
+        soup = BeautifulSoup(res.text, "html.parser")
+        rows = soup.select("table tr")[1:]  # pomijamy nagłówek
+        posiedzenia = []
+
+        for row in rows:
+            cols = row.find_all("td")
+            if len(cols) >= 2:
+                date = cols[0].get_text(strip=True)
+                title = cols[1].get_text(strip=True)
+                posiedzenia.append({"date": date, "title": title})
+
+        print(f"HTML ({kod}): znaleziono {len(posiedzenia)} posiedzeń.")
+        return posiedzenia
+
+    except Exception as e:
+        print(f"Błąd HTML dla {kod}: {e}")
+        return []
 
 @app.route("/")
 def index():
     dane = {}
     for kod in KOMISJE:
         z_api = pobierz_posiedzenia_api(kod)
-        z_html = pobierz_posiedzenia_html(kod) if kod == "DER" else []
+        z_html = pobierz_posiedzenia_html(kod)
         dane[kod] = z_api + z_html
     return render_template_string(HTML_TEMPLATE, dane=dane)
 
